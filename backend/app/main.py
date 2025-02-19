@@ -1,69 +1,87 @@
 from fastapi import FastAPI, UploadFile, File
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-
+from fastapi.responses import StreamingResponse
+from models.resnet_model import ResNetModel
+from models.yolo_model import YOLODetector
+from camera_handler import CameraHandler
+import shutil
 import cv2
-import numpy as np
-import torch
-import torchvision.models as models
-from torchvision import transforms
-from io import BytesIO
-from PIL import Image
+import time
+from fastapi.middleware.cors import CORSMiddleware
 
+# FastAPI 앱 생성
 app = FastAPI()
 
-### CORS 설정 (Vue.js 프론트엔드에서 API 호출 허용)
+# CORS 정책 설정
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 배포 시 특정 도메인으로 제한해야 함
+    allow_origins=["*"],  # 모든 도메인 허용 (배포 시 특정 도메인만 허용)
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # 모든 HTTP 메서드 허용
+    allow_headers=["*"],  # 모든 헤더 허용
 )
 
-### 모델 로드
-device = "cuda" if torch.cuda.is_available() else "cpu"
+video_path="./temp/test_video.mp4"
 
-model = models.resnet50(weights=None)  # 사전 학습 없이 ResNet50 로드
-num_ftrs = model.fc.in_features
-model.fc = torch.nn.Linear(num_ftrs, 3)  # 2개 클래스 분류
-model.load_state_dict(torch.load("./models/best_model.pth", map_location=device))  # 가중치 로드
+# 모델 로드
+resnet_model = ResNetModel("./models/best_model.pth")
+yolo_detector = YOLODetector("./models/yolov8n.pt")
+camera_handler = CameraHandler(video_path)
 
-model.to(device)
-model.eval()
+monitoring_state = {"state": "inactive", "alert": False}  # 모니터링 상태 변수
 
-"""이미지 처리 함수"""
-def detect_risk(image: Image.Image):
-    img = np.array(image)
-    img_resized = cv2.resize(img, (224, 224))  # 모델 입력 크기에 맞게 변환
-    img_tensor = transforms.ToTensor()(img_resized).unsqueeze(0).to(device)  # (1, C, H, W)
+@app.get("/video_feed")
+async def video_feed():
+    return camera_handler.get_video_stream()
 
-    with torch.no_grad():
-        output = model(img_tensor)
-        probabilities = torch.softmax(output, dim=1)  # softmax 적용
-        risk_prob = probabilities[0, 0].item()  # 위험 확률 추출
+# 모니터링 시작 API
+@app.post("/start_monitoring")
+async def start_monitoring():
+    monitoring_state["state"] = "active"
+    monitoring_state["alert"] = False
+    return {"status": "monitoring started"}
 
-    alert_text = "Dangerous!" if risk_prob > 0.5 else "Safe :)"
-    return {"alert": alert_text, "risk_prob": risk_prob}
+# 모니터링 중지 API
+@app.post("/stop_monitoring")
+async def stop_monitoring():
+    monitoring_state["state"] = "inactive"
+    monitoring_state["alert"] = False
+    return {"status": "monitoring stopped"}
 
+# 현재 모니터링 상태 조회 API
+@app.get("/get_status")
+async def get_status():
+    return monitoring_state
 
-class DataModel(BaseModel):
-    data: str  # 문자열 데이터를 받을 필드
+# 이미지 업로드 & 분석 API
+@app.post("/analyze_image")
+async def analyze_image(file: UploadFile = File(None)):  # 파일을 선택적으로 받음
+    global monitoring_state
 
+    #  파일이 없으면 카메라 프레임을 캡처
+    if file is None:
+        success, frame = camera_handler.cap.read()
+        if not success:
+            return {"error": "카메라 프레임을 읽을 수 없음"}
+        image_path = "./temp/test.jpg"
+        cv2.imwrite(image_path, frame) # 캡처된 프레임을 test.jpg 파일로 저장
+        
+    # ResNet 모델로 앞면/뒷면/옆면 판별
+    position = resnet_model.predict(image_path)
 
-@app.get("/")
-def home():
-    return {"message": "Hello from FastAPI!"}
+    # YOLO 모델로 코 & 입 감지
+    nose_detected, mouth_detected = yolo_detector.detect_nose_mouth(image_path)
 
-@app.post("/data")
-def receive_data(payload: DataModel):
-    return {"message": f"서버가 받은 데이터: {payload.data}"}
+    alert = not (nose_detected and mouth_detected)  # 둘 다 감지되지 않으면 위험
+    monitoring_state["alert"] = alert
 
-@app.post("/predict/")
-async def predict(file: UploadFile = File(...)):
-    contents = await file.read()
-    image = Image.open(BytesIO(contents)).convert("RGB")  # 이미지 로드
-    result = detect_risk(image)
-    return result
+    print("현상태: ",monitoring_state)
 
-# 실행 명령어: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    return {
+        "position": position,
+        "nose_detected": nose_detected,
+        "mouth_detected": mouth_detected,
+        "alert": alert
+    }
+
+# ✅ FastAPI 서버 실행 명령어
+# uvicorn main:app --host 0.0.0.0 --port 8000 --reload
