@@ -16,8 +16,8 @@
 
     <!-- 버튼 그룹(@click 디렉티브를 사용하여 버튼 클릭 시 특정 메서드 실행) -->
     <div class="button-group">
-      <button @click="startMonitoring" class="start-button">Start monitoring</button>
-      <button @click="stopMonitoring" class="stop-button">Stop monitoring</button>
+      <button @click="startMonitoring" class="start-button" :class="{ active: isMonitoring }">Start monitoring</button>
+      <button @click="stopMonitoring" class="stop-button" :class="{ active: !isMonitoring }">Stop monitoring</button>
     </div>
   </div>
 </template>
@@ -28,12 +28,14 @@ import axios from "axios";
 export default {
   data() {
     return {
-      monitoringState: "inactive",
+      monitoringState: "inactive", // 상태 (inactive, active, alert)
+      isMonitoring: false, // 루프 실행 여부 추가 (true, false)
       alertDetected: false,
       alertStartTime: null,
       elapsedTime: "00:00",
       timerInterval: null,
-      videoStreamUrl: "http://localhost:8000/video_feed",
+      videoStreamUrl: "http://localhost:8000/video_feed", //FastAPI 백엔드 서버에서 제공하는 비디오 스트림 엔드포인트를 가리키는 URL이다.
+      // 즉, 웹 브라우저에서 이 URL을 img 태그에 설정하면 스트리밍 영상이 실시간으로 갱신됨.
     };
   },
   computed: {
@@ -45,9 +47,9 @@ export default {
       };
     },
     statusText() {
-      if (this.monitoringState === "inactive") return " 모니터링 비활성화 상태";
-      if (this.monitoringState === "active") return " 실시간 모니터링 중";
-      if (this.monitoringState === "alert") return " 위험이 감지되었습니다.";
+      if (this.monitoringState === "inactive") return "모니터링 비활성화 상태";
+      if (this.monitoringState === "active") return "실시간 모니터링 중";
+      if (this.monitoringState === "alert") return "위험이 감지되었습니다.";
       return "";
     },
     statusIcon() {
@@ -64,8 +66,9 @@ export default {
         this.monitoringState = "active";
         this.alertDetected = false;
         this.elapsedTime = "00:00";
-        clearInterval(this.timerInterval); // 이전 타이머를 정리
-        this.monitoringLoop(); // 모니터링 상태를 계속 가져오는 함수 실행
+        clearInterval(this.timerInterval);
+        this.isMonitoring = true; // 모니터링 루프 실행 플래그 ON
+        this.monitoringLoop(); // 루프 돌리기 
       } catch (error) {
         console.error("Error starting monitoring:", error);
       }
@@ -77,40 +80,62 @@ export default {
         this.alertDetected = false;
         this.elapsedTime = "00:00";
         clearInterval(this.timerInterval);
+        this.isMonitoring = false; //모니터링 루프 중단
       } catch (error) {
         console.error("Error stopping monitoring:", error);
       }
     },
     async monitoringLoop() {
-  while (this.monitoringState === "active") {
-    try {
-      // ✅ 아기 상태 분석 요청
-      const analyzeResponse = await axios.post("http://localhost:8000/analyze_image", 
-        { file: null },  // 파일이 없더라도 요청을 보냄
-        { headers: { "Content-Type": "multipart/form-data" } }
-      );
-      console.log("analyze_image 실행 결과:", analyzeResponse.data);
+      let alertCount = 0;
+      let safeCount = 0;
 
-      // ✅ 최신 상태 가져오기
-      const response = await axios.get("http://localhost:8000/get_status");
-      const { state, alert, position } = response.data;
+      while (this.isMonitoring) { // 모니터링 상태에 따라 계속 실행됨
+        try {
+          const analyzeResponse = await axios.post("http://localhost:8000/analyze_image", 
+            { file: null },  
+            { headers: { "Content-Type": "multipart/form-data" } }
+          );
 
-      console.log("백엔드 상태 업데이트:", state, alert, position);
+          const { position, nose_detected, mouth_detected } = analyzeResponse.data;
 
-      this.alertDetected = alert; // UI 업데이트
-      this.monitoringState = alert ? "alert" : "active";
+          console.log(`Position: ${position}, Nose: ${nose_detected}, Mouth: ${mouth_detected}`);
 
-      if (alert && !this.alertStartTime) {  
-        this.alertStartTime = new Date();
-        this.timerInterval = setInterval(this.updateElapsedTime, 1000);
+          if (position === "Back" && (!nose_detected || !mouth_detected)) {
+            alertCount++;
+            safeCount = 0;
+          } else {
+            safeCount++;
+            alertCount = 0;
+          }
+
+          console.log(`위험 감지 횟수: ${alertCount}, 안전 감지 횟수: ${safeCount}`);
+
+          if (alertCount >= 1) {
+            this.alertDetected = true;
+            this.monitoringState = "alert";
+            if (!this.alertStartTime) {
+              this.alertStartTime = new Date();
+              this.timerInterval = setInterval(this.updateElapsedTime, 1000);
+            }
+          }
+
+          // `alert` 상태에서도 분석 계속 수행
+          if (safeCount >= 3 && this.monitoringState === "alert") {
+            this.alertDetected = false;
+            this.monitoringState = "active";
+            this.alertStartTime = null;
+            clearInterval(this.timerInterval);
+            this.elapsedTime = "00:00";
+            console.log("안전 상태로 복귀");
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, 1000)); // 서버 과부화 방지지
+        } catch (error) {
+          console.error("분석 중 오류 발생:", error);
+          break;
+        }
       }
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // 1초 대기 후 다시 실행
-    } catch (error) {
-      console.error("🚨 분석 중 오류 발생:", error);
-      break;
-    }
-  }
-},
+    },
     updateElapsedTime() {
       if (!this.alertStartTime) return;
       const now = new Date();
@@ -124,90 +149,78 @@ export default {
 </script>
 
 
+
 <style scoped>
-/* ✅ 전체 컨테이너 스타일 */
 .monitoring-container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 20px;
+  padding: 2vh;
 }
 
-/* ✅ 상태 박스 */
+/* 상태 박스 */
 .status-box {
+  width: 60vw;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 90%;
-  padding: 10px;
-  border-radius: 20px;
-  font-size: 1.2rem;
-  font-weight: bold;
-  border: 1px solid #ddd;
-  margin-bottom: 15px;
-  transition: background-color 0.5s ease-in-out;
+  padding: 2vh;
+  border-radius: 3vh;
+  font-size: 1rem;
+  border: 0.1rem solid #ddd;
+  margin-bottom: 2vh;
+  transition: color 0.5s ease-in-out;
 }
 
-/* ✅ 상태별 색상 */
+/* 상태별 색상 */
 .status-inactive {
-  background: #f8f8f8;
   color: #666;
 }
 .status-active {
-  background: #eef4ff;
   color: #5b9cf5;
 }
 .status-alert {
-  background: #ffeded;
   color: #d32f2f;
 }
 
-/* ✅ 위험 감지 타이머 */
+/* 위험 감지 타이머 */
 .alert-timer {
   font-size: 1.2rem;
   font-weight: bold;
   color: #d32f2f;
-  margin-bottom: 10px;
+  margin-bottom: 1vh;
 }
 
-/* ✅ 모니터링 화면 (스트리밍) */
+/* 스트리밍 화면 */
 .monitoring-image {
-  width: 100%;
-  max-width: 500px;
-  border-radius: 10px;
-  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+  width: 90vw;
+  max-width: 50rem;
+  border-radius: 1vh;
+  box-shadow: 0 0.5vh 1vh rgba(0, 0, 0, 0.1);
 }
 
-/* ✅ 버튼 그룹 */
+/* 버튼 그룹 */
 .button-group {
   display: flex;
-  gap: 10px;
-  margin-top: 20px;
+  gap: 10vw;
+  margin-top: 2vh;
 }
 
-/* ✅ 버튼 스타일 */
+/* 버튼 스타일 */
 button {
-  padding: 10px 15px;
+  padding: 1.5vh 2vw;
   font-size: 1rem;
   font-weight: bold;
   border: none;
-  border-radius: 10px;
+  border-radius: 2vh;
   cursor: pointer;
-  transition: background-color 0.3s ease;
-  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
-}
-
-.start-button {
-  background: #d7eaff;
-  color: #1565c0;
-}
-
-.stop-button {
+  box-shadow: 0.2vh 0.2vh 1vh rgba(0, 0, 0, 0.1);
   background: #e0e0e0;
   color: #333;
+  transition: background-color 0.3s ease;
+}
+.start-button.active, .stop-button.active  {
+  background-color: #77C3F2;
 }
 
-button:hover {
-  opacity: 0.8;
-}
 </style>

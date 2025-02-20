@@ -8,12 +8,12 @@ class ResNetModel:
     def __init__(self, model_path):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
-        # ✅ ResNet50 모델 불러오기
+        # ResNet50 모델 불러오기
         self.model = models.resnet50(weights=None)
         num_ftrs = self.model.fc.in_features
         self.model.fc = torch.nn.Linear(num_ftrs, 3)  # 🔹 3개 클래스 (Back, Front, Side)
 
-        # ✅ 저장된 가중치 로드
+        # 저장된 가중치 로드
         self.model.load_state_dict(torch.load(model_path, map_location=self.device))
         self.model.to(self.device)
         self.model.eval()  # 🔥 모델을 평가 모드로 전환
@@ -25,8 +25,7 @@ class ResNetModel:
         ])
         self.class_names = ["Back", "Front", "Side"]  # 클래스 이름
 
-    def predict(self, image_path):
-        image = Image.open(image_path).convert("RGB")
+    def predict(self, image):
         image_tensor = self.transform(image).unsqueeze(0).to(self.device)
 
         with torch.no_grad():
