@@ -1,7 +1,7 @@
 import router from './router/index'; 
 
 import { library } from "@fortawesome/fontawesome-svg-core";
-import { faHome, faVideo, faCalendar, faCog, faVideoSlash, faBell, faCalendarAlt, faPen } from "@fortawesome/free-solid-svg-icons";
+import { faHome, faVideo, faCalendar, faCog, faVideoSlash, faBell, faCalendarAlt, faPen, faChevronRight, faArrowLeft } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 
 import { createApp } from 'vue'
@@ -9,7 +9,7 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 
 // 여기에 개별 아이콘을 추가해야 함!
-library.add(faHome, faVideo, faCalendar, faCog, faVideoSlash, faBell, faCalendarAlt, faPen );
+library.add(faHome, faVideo, faCalendar, faCog, faVideoSlash, faBell, faCalendarAlt, faPen, faChevronRight, faArrowLeft );
 
 const app = createApp(App)
 

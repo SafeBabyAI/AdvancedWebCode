@@ -37,7 +37,7 @@
 }
 
 .nav-item svg {
-  width: 1.8rem; /* ✅ 아이콘 크기 조정 */
+  width: 1.8rem; /* 아이콘 크기 조정 */
   height: 1.8rem;
 }
 
