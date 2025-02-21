@@ -1,4 +1,4 @@
-from database import engine, Base
+from db import engine, Base
 from user import User
 from history import ObservationHistory
 

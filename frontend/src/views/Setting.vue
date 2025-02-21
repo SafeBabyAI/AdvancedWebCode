@@ -1,6 +1,5 @@
 <template>
   <div class="settings-page">
-    <!-- 상단 메뉴 리스트 -->
 
     <div class="menu-list">
       <router-link to="/account" class="menu-item">

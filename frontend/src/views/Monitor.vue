@@ -5,20 +5,32 @@
       <font-awesome-icon :icon="statusIcon" class="status-icon" />
       <span>{{ statusText }}</span>
     </div>
+
     <!--  위험 감지 시 경과 시간 표시(alertDetected가 true일 때만 이 <div>가 렌더링됨) -->
-    <div v-if="alertDetected" class="alert-timer">
+    <div v-if="monitoringState === 'alert'" class="alert-timer">
       뒤집기 관측 경과시간 {{ elapsedTime }}
     </div>
+
     <!--  웹캠 영상 표시 -->
     <video ref="videoElement" autoplay playsinline class="monitoring-image"></video>
+    
     <!-- 버튼 그룹(@click 디렉티브를 사용하여 버튼 클릭 시 특정 메서드 실행) -->
     <div class="button-group">
       <button @click="startMonitoring" class="start-button" :class="{ active: isMonitoring }">Start monitoring</button>
       <button @click="stopMonitoring" class="stop-button" :class="{ active: !isMonitoring }">Stop monitoring</button>
     </div>
+
+    <!-- 🔹 알림 중지 버튼 (alert 상태에서만 보이게 설정) -->
+    <button v-if="monitoringState === 'alert'" @click="stopAlert" class="alert-button">
+        알림 중지
+    </button>
+
   </div>
 </template>
 <script>
+
+import axios from "axios";
+
 export default {
   data() {
     return {
@@ -32,23 +44,15 @@ export default {
       videoStream: null, // 웹캠 스트림
       canvas: null, // 프레임을 캡처할 캔버스
       ctx: null, // 캔버스 컨텍스트
-
-      alertCount: 0,  
-      safeCount: 0,  
     };
   },
   computed: {
-    ALERT_THRESHOLD() {
-      return 100;  // 위험 감지 기준
-    },
-    SAFE_THRESHOLD() {
-      return 3;  // 안전 감지 기준
-    },
     statusClass() {
       return {
         "status-inactive": this.monitoringState === "inactive",
         "status-active": this.monitoringState === "active",
         "status-alert": this.monitoringState === "alert",
+        "status-alert-blink": this.monitoringState === "alert",
       };
     },
     statusText() {
@@ -66,30 +70,52 @@ export default {
   },
   methods: {
     async startMonitoring() {
+      if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+          console.log("❌ 이미 WebSocket이 연결된 상태입니다!");
+          return; // 기존 연결이 존재하면 함수 종료
+      }
       try {
         this.isMonitoring = true;
         this.monitoringState = "active";
         this.elapsedTime = "00:00";
+        this.alertStartTime = null;
         clearInterval(this.timerInterval);
-        this.alertCount = 0; // 위험 감지 카운트 초기화
-        this.safeCount = 0; // 안전 감지 카운트 초기화
 
         // 웹캠 시작
         await this.startWebcam();
 
-        // WebSocket 연결 (배포 시 바꿔야)
+        // WebSocket 연결 (보안 상의 이유로 JWT를 쿼리 파라미터로 보내지 않음)
         this.websocket = new WebSocket("ws://127.0.0.1:8000/ws");
 
         this.websocket.onopen = () => {
-          console.log("WebSocket 연결됨");
-          this.sendFrames(); // 웹캠 프레임을 서버로 전송 시작
-        };
-        this.websocket.onmessage = (event) => { // 서버에서 메세지를 받을 때만 실행 
-          this.handleServerResponse(event.data); // 서버의 응답을 처리하는 함수
-        };
+            console.log("✅ WebSocket 연결됨");
 
+            // WebSocket 연결 후, JWT 토큰을 첫 메시지로 전송하여 인증 요청
+            const token = localStorage.getItem("token"); // JWT 가져오기
+            console.log("🚀 JWT 전송:", token);
+            this.websocket.send(JSON.stringify({ type: "auth", token: token }));
+
+            // 서버로부터 인증 성공 응답을 받으면 프레임 전송 시작
+            this.websocket.onmessage = (event) => {
+              console.log("📩 서버 응답:", event.data);  
+                const response = JSON.parse(event.data);
+
+                if (response.status === "unauthorized") {
+                    console.error("❌ 인증 실패: WebSocket 연결 종료");
+                    this.websocket.close();
+                } else if (response.status === "authorized") {
+                    console.log("✅ WebSocket 인증 성공, 데이터 전송 시작");
+                    this.sendFrames();
+                } else {
+                    this.handleServerResponse(response);
+                }
+            };
+        };
         this.websocket.onerror = (error) => console.error("WebSocket 오류:", error);
-        this.websocket.onclose = () => console.log("WebSocket 연결 종료됨");
+        this.websocket.onclose = () => {
+          console.log("WebSocket 연결 종료됨");
+          this.websocket = null; // 연결 종료 시 WebSocket 객체 초기화
+      };
 
       } catch (error) {
         console.error("Error starting monitoring:", error);
@@ -97,9 +123,14 @@ export default {
     },
 
     stopMonitoring() {
+      if (!this.websocket || this.websocket.readyState !== WebSocket.OPEN) {
+      console.log("⚠️ WebSocket이 이미 닫혀 있습니다.");
+      return;
+    }
       this.isMonitoring = false;
       this.monitoringState = "inactive";
       this.elapsedTime = "00:00";
+      this.alertStartTime = null;
       clearInterval(this.timerInterval);
 
       // 웹캠 종료
@@ -108,7 +139,9 @@ export default {
       }
       // WebSocket 종료
       if (this.websocket) {
+        console.log("WebSocket 연결 종료 중...");
         this.websocket.close();
+        this.websocket = null;
       }
     },
 
@@ -145,39 +178,24 @@ export default {
         }
       }, "image/jpeg");
 
-      setTimeout(() => this.sendFrames(), 100); // 100ms(0.1초) 후에 sendFrames() 함수를 다시 호출
+      setTimeout(() => this.sendFrames(), 1000); // 1000ms(1초) 후에 sendFrames() 함수를 다시 호출
     },
 
-    handleServerResponse(data) {
-      const response = JSON.parse(data);
-      console.log("서버 응답:", response);
+    handleServerResponse(response) {
 
-      // 위험 감지 조건 (Back이고 코 or 입 감지 안 됨)
-      if (response.position === "Back" && (!response.nose_detected || !response.mouth_detected)) {
-        this.alertCount++;  
-        this.safeCount = 0;  
-      }  // 안전 감지 조건 (Front or Slide 이고 코 or 입 감지 안 됨)
-      else if (["Front", "Side"].includes(response.position) && response.nose_detected && response.mouth_detected) { // (Front 또는 Side이고, 코/입 감지됨)
-        this.safeCount++;  
-        this.alertCount = 0;  
-      }
+      console.log("서버 응답:", response.status);
 
-      if (this.alertCount >= this.ALERT_THRESHOLD) {
-        if (this.monitoringState !== "alert") {
-          this.monitoringState = "alert";
-          this.alertStartTime = new Date();
-          
-          this.timerInterval = setInterval(this.updateElapsedTime, 1000);
+      // 서버에서 "alert" 상태 수신
+      if (response.status === "alert") {
+        this.monitoringState = "alert";
+        // 기존 타이머 제거 후 새로운 타이머 설정
+        if (!this.timerInterval) {
+          this.alertStartTime = new Date();  // alert 시작 시간 설정
+          this.timerInterval = setInterval(() => {
+            this.updateElapsedTime();
+          }, 1000);
         }
       }
-      if (this.safeCount >= SAFE_THRESHOLD && this.monitoringState === "alert") {
-        this.monitoringState = "active";
-        this.alertStartTime = null;
-
-        clearInterval(this.timerInterval);
-        this.elapsedTime = "00:00";
-      }
-
     },
     updateElapsedTime() {
       if (!this.alertStartTime) return;
@@ -187,19 +205,61 @@ export default {
       const seconds = String(diff % 60).padStart(2, "0");
       this.elapsedTime = `${minutes}:${seconds}`;
     },
+    async stopAlert() {
+      try {
+        const token = localStorage.getItem("token"); // JWT 가져오기
+        const response = await axios.post("http://127.0.0.1:8000/stop_alert", {}, {
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}` // ✅ JWT를 헤더에 포함하여 user_id 가져오기
+        }
+        });
+        const data = response.data;
+        console.log("📢 알림 중지 응답:", data);
+
+        if (data.status === "alert stopped by user") {
+          this.monitoringState = "inactive";  // 일단 inactive로 설정
+          clearInterval(this.timerInterval);
+          this.timerInterval = null;
+          this.elapsedTime = "00:00";
+
+          await this.$nextTick(); // 상태 변경 후 DOM 업데이트 보장
+          this.monitoringState = "active"; // 다시 active로 변경
+
+          // this.monitoringState = "active";
+          // this.alertStartTime = null;
+          // clearInterval(this.timerInterval);
+          // this.elapsedTime = "00:00";
+        }
+      } catch (error) {
+        console.error("❌ 알림 중지 요청 실패:", error);
+      }
+    },
   },
 };
 </script>
 
-
 <style scoped>
+
+@keyframes alert-blink {
+  0% { background-color: rgba(255, 0, 0, 0.5); }
+  50% { background-color: rgba(255, 0, 0, 0.2); }
+  100% { background-color: rgba(255, 0, 0, 0.5); }
+}
+
+/* 기본 컨테이너 스타일 */
 .monitoring-container {
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 2vh;
+  transition: background-color 0.3s ease-in-out;
 }
 
+/* 🔴 Alert 상태일 때 깜빡이는 애니메이션 적용 */
+.status-alert-blink {
+  animation: alert-blink 1s infinite alternate; /* 1초마다 색상 변경 */
+}
 /* 상태 박스 */
 .status-box {
   width: 60vw;
@@ -263,6 +323,11 @@ button {
 }
 .start-button.active, .stop-button.active  {
   background-color: #77C3F2;
+}
+.alert-button{
+  background-color: #d32f2f;
+  color : white;
+  margin-top : 2vh;
 }
 
 </style>

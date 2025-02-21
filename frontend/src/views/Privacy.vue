@@ -1,19 +1,11 @@
 <template>
     <div class="privacy-container">
-      <!-- 🔹 헤더 (뒤로가기 + 제목) -->
-      <div class="header">
-        <button @click="$router.go(-1)" class="back-button">
-          <font-awesome-icon :icon="['fas', 'arrow-left']" />
-        </button>
-        <h2>Privacy & Terms</h2>
-      </div>
-  
-      <!-- 🔹 정책 본문 -->
+      <!-- 정책 본문 -->
       <div class="content">
         <h3>Privacy Policy & Terms of Use</h3>
         <p class="updated-date">Last Updated: 2025.02.19</p>
   
-        <!-- 🔹 정책 목록 -->
+        <!-- 정책 목록 -->
         <div class="policy-section" v-for="(section, index) in policies" :key="index">
           <h4>{{ index + 1 }}. {{ section.title }}</h4>
           <ul>
@@ -74,7 +66,7 @@
   </script>
   
   <style scoped>
-  /* ✅ 전체 컨테이너 스타일 */
+  /* 전체 컨테이너 스타일 */
   .privacy-container {
     display: flex;
     flex-direction: column;
@@ -82,8 +74,12 @@
     padding: 20px;
     font-family: Arial, sans-serif;
   }
+  .content{
+    padding: 1rem;
+    margin-bottom: 10vh;
+  }
   
-  /* ✅ 헤더 스타일 */
+  /* 헤더 스타일 */
   .header {
     width: 100%;
     display: flex;
@@ -100,7 +96,7 @@
     cursor: pointer;
   }
   
-  /* ✅ 본문 스타일 */
+  /* 본문 스타일 */
   .content {
     width: 100%;
     max-width: 600px;
@@ -114,7 +110,7 @@
     margin-bottom: 15px;
   }
   
-  /* ✅ 정책 섹션 스타일 */
+  /* 정책 섹션 스타일 */
   .policy-section {
     margin-bottom: 20px;
   }

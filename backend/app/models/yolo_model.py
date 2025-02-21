@@ -3,7 +3,7 @@ import cv2
 
 class YOLODetector:
     def __init__(self, model_path):
-        self.model = YOLO(model_path)
+        self.model = YOLO(model_path, verbose=False)
 
     def detect_nose_mouth(self, image):
         results = self.model.predict(image, conf=0.5)  # 🔹 신뢰도 50% 이상 객체 탐지
