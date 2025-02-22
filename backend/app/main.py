@@ -148,6 +148,10 @@ async def stop_monitoring():
 async def get_status():
     return monitoring_state
 
+@app.get("/")
+def root():
+    return {"message": "Hello World"}
+
 @app.post("/stop_alert")
 async def stop_alert(user_id: int = Depends(get_current_user_id), db=Depends(get_db)):
     """사용자가 버튼을 눌러서 강제로 알림을 멈출 때 호출 (user_id 기준으로 찾음)"""
