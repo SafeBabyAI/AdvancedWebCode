@@ -112,6 +112,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     # 5번째 alert 시점에서 이미지 저장
                     time_stamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
                     blob_url = upload_image_to_blob(image, f"monitoring/{time_stamp}.jpg")
+                    print('이미지 저장됨!!!')
 
                     if blob_url:
                         client_state["first_alert_frame"] = client_state["frame_count"]

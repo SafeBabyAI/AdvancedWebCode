@@ -7,7 +7,7 @@ import os, json
 from data.history import ObservationHistory
 from dotenv import load_dotenv
 from data.imgdb import download_images_from_blob
-import base64
+import base64, datetime
 
 # 환경 변수 로드
 load_dotenv()
@@ -23,6 +23,11 @@ class HistorySearchRequest(BaseModel):
 def get_images_by_date(request: HistorySearchRequest, db: Session = Depends(get_db)):
     """특정 날짜의 감지 기록을 조회하고, 해당하는 이미지들을 클라이언트에 반환"""
     try:
+        print('request:' ,request.date)
+
+        # `request.date` 타입 확인을 위한 출력 추가
+        print(f"request.date 타입: {type(request.date)}")
+        
         history_records = (
             db.query(ObservationHistory.timestamp, ObservationHistory.duration, 
                      ObservationHistory.observed_info, ObservationHistory.image_url)
@@ -30,9 +35,11 @@ def get_images_by_date(request: HistorySearchRequest, db: Session = Depends(get_
             .order_by(ObservationHistory.timestamp.desc())
             .all()
         )
+
         if not history_records:
             raise HTTPException(status_code=404, detail="선택한 날짜에 감지된 기록이 없습니다.")
         
+        print('히스토리 : ',history_records)
         # Blob Storage에서 해당 날짜의 이미지 다운로드
         images = download_images_from_blob(request.date)
         # print(f"가져온 이미지 수: {len(images)}")
@@ -42,6 +49,7 @@ def get_images_by_date(request: HistorySearchRequest, db: Session = Depends(get_
         
         # 이미지 URL을 키로 하는 딕셔너리 생성 (Blob Storage에서 다운로드한 이미지 데이터)
         image_map = {img["url"]: base64.b64encode(img["image"]).decode("utf-8") for img in images}
+    
 
         response_data = [
             {
