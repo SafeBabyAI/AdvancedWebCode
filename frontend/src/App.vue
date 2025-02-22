@@ -45,6 +45,7 @@ export default {
           } else {
             this.redirectToLogin();
           }
+          console.log('로그인 확인')
         } catch (error) {
           console.error("로그인 확인 실패:", error);
           this.redirectToLogin();
@@ -66,10 +67,9 @@ export default {
       }, 1000); // 스플래시 후 딜레이
     },
   },
-
-  mounted() {
-    this.checkLogin(); // 앱이 시작될 때 자동 로그인 확인
-  },
+  // mounted() {
+  //   this.checkLogin(); // 앱이 시작될 때 자동 로그인 확인
+  // },
 };
 </script>
 

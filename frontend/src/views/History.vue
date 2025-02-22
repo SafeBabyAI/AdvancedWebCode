@@ -15,10 +15,10 @@ import BottomNavigation from "@/components/BottomNavigation.vue";
         <ul>
           <li v-for="image in images" :key="image.url">
             <img :src="'data:image/jpeg;base64,' + image.image_base64" class="history-image" alt="감지 이미지" />
-            <p><strong>시간:</strong> {{ formatTime(image.timestamp) }}</p>
-            <p><strong>지속 시간:</strong> {{ image.duration }}초</p>
+            <p><strong>관측 시간:</strong> {{ formatTime(image.timestamp) }}</p>
+            <p><strong>지속 시간:</strong> {{ image.duration }} Frame</p>
             <p><strong>상태:</strong> {{ parseObservedInfo(image.observed_info).position }}</p>
-            <p><strong>코/입 감지:</strong> 
+            <p><strong>코/입 상태:</strong> 
               코 {{ parseObservedInfo(image.observed_info).nose_detected ? "✅" : "❌" }}, 
               입 {{ parseObservedInfo(image.observed_info).mouth_detected ? "✅" : "❌" }}
             </p>
@@ -64,12 +64,16 @@ export default {
       const date = new Date(timestamp);  // UTC 기준으로 생성된 Date 객체
       date.setHours(date.getHours() + 9);  // 한국 시간 (UTC+9)으로 변환
 
-      // 시간만 HH:mm:ss 형식으로 추출
-      const hours = String(date.getHours()).padStart(2, "0");
-      const minutes = String(date.getMinutes()).padStart(2, "0");
-      const seconds = String(date.getSeconds()).padStart(2, "0");
-      
-      return `${hours}:${minutes}:${seconds}`;  // 한국 시간(HH:mm:ss) 반환
+      // 12시간제 AM/PM 형식으로 시간 변환
+    let hours = date.getHours();
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    const seconds = String(date.getSeconds()).padStart(2, "0");
+
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12;  // 12시간제로 변환
+    hours = hours ? hours : 12; // 0을 12로 변환
+
+    return `${hours}:${minutes}:${seconds} ${ampm}`; 
     },
     parseObservedInfo(observedInfo) {
       try {
@@ -100,6 +104,7 @@ export default {
   max-width: 90vw;  /* 화면 너비 비율로 max-width 설정 */
   margin-left: auto;
   margin-right: auto;
+  margin-bottom: 10vh;
 }
 
 .image-list h3 {
