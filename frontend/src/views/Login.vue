@@ -40,7 +40,6 @@ export default {
           username: this.username,
           password: this.password,
         });
-        console.log(response.data.access_token)
         localStorage.setItem("token", response.data.access_token); // 토큰 저장
         this.$router.push("/"); // 로그인 성공 -> 홈으로 리다이렉션 
       } catch (error) {

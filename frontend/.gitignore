@@ -29,6 +29,8 @@ coverage
 
 *.tsbuildinfo
 
-backend/app/temp/
+temp/
 backend/app/data/create.py
-*/.env
+
+.env
+**/.env
