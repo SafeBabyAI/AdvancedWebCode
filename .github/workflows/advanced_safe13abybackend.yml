@@ -30,19 +30,21 @@ jobs:
           source venv/bin/activate
       
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r backend/requirements.txt  # 백엔드 의존성 설치
         
       # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
 
       - name: Zip artifact for deployment
-        run: zip release.zip ./* -r
+        run: |
+          cd backend
+          zip -r backend.zip .  # backend 디렉토리 압축
 
       - name: Upload artifact for deployment jobs
         uses: actions/upload-artifact@v4
         with:
-          name: python-app
+          name: backend-app 
           path: |
-            release.zip
+            backend.zip 
             !venv/
 
   deploy:
@@ -56,11 +58,11 @@ jobs:
       - name: Download artifact from build job
         uses: actions/download-artifact@v4
         with:
-          name: python-app
+          name: backend-app
 
-      - name: Unzip artifact for deployment
-        run: unzip release.zip
-
+      - name: Unzip backend artifact for deployment
+        run: |
+          unzip backend.zip -d backend  # 백엔드 ZIP 파일 압축 해제
       
       - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v3
