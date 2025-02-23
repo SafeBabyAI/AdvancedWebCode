@@ -7,7 +7,7 @@ import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
-import './registerServiceWorker'
+//import './registerServiceWorker'
 
 // 여기에 개별 아이콘을 추가해야 함!
 library.add(faHome, faVideo, faCalendar, faCog, faVideoSlash, faBell, faCalendarAlt, faPen, faChevronRight, faArrowLeft, faChevronLeft );
@@ -20,7 +20,7 @@ app.use(router);
 app.component("font-awesome-icon", FontAwesomeIcon);
 
 // 서비스 워커 등록
-if (process.env.NODE_ENV === 'production') {
+/*if (process.env.NODE_ENV === 'production') {
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker
@@ -34,5 +34,5 @@ if (process.env.NODE_ENV === 'production') {
       });
     }
   }
-  
+  */
 app.mount('#app');

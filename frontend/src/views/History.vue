@@ -34,6 +34,7 @@ import BottomNavigation from "@/components/BottomNavigation.vue";
 
 <script>
 import axios from "axios";
+import api from "@/services/api";
 
 export default {
   data() {
@@ -46,7 +47,7 @@ export default {
     async fetchImagesByDate(date) {
       this.selectedDate = date; // 선택한 날짜 저장
       try {
-        const response = await axios.post("http://127.0.0.1:8000/api/history/images", {
+        const response = await api.post("backend/api/history/images", {
           date: this.selectedDate,
         });
 

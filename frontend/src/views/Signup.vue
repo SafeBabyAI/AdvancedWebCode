@@ -23,6 +23,7 @@
   
   <script>
   import axios from "axios";
+  import api from "@/services/api";
   
   export default {
     data() {
@@ -35,7 +36,7 @@
     methods: {
       async handleSignup() {
         try {
-          await axios.post("http://localhost:8000/auth/signup/", {
+          await api.post("backend/auth/signup/", {
             username: this.username,
             email: this.email,
             password: this.password,

@@ -23,6 +23,7 @@
 
 <script>
 import axios from "axios";
+import api from "@/services/api";
 
 export default {
   data() {
@@ -36,7 +37,7 @@ export default {
     async login() {
       this.errorMessage = ""; 
       try {
-        const response = await axios.post("http://127.0.0.1:8000/auth/login", {
+        const response = await api.post("backend/auth/login/", {
           username: this.username,
           password: this.password,
         });

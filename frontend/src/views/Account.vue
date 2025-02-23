@@ -14,6 +14,7 @@
 
 <script>
 import axios from "axios";
+import api from "@/services/api";
 
 export default {
   name: "AccountPage",
@@ -32,7 +33,7 @@ export default {
           return;
         }
 
-        const response = await axios.get("http://127.0.0.1:8000/auth/user/me", {
+        const response = await api.get("backend/auth/user/me", {
           headers: { Authorization: `Bearer ${token}` }
         });
 

@@ -1,6 +1,7 @@
 <script setup>
 import BottomNavigation from "@/components/BottomNavigation.vue";
 import TopNav from "@/components/TopNavigation.vue";
+import api from "@/services/api";
 </script>
 
 <template>
@@ -36,7 +37,7 @@ export default {
 
       if (token) {
         try {
-          const response = await axios.get("http://127.0.0.1:8000/auth/check", {
+		const response = await api.get("backend/auth/check", {
             headers: { Authorization: `Bearer ${token}` },
           });
 

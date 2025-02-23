@@ -13,14 +13,14 @@ export default defineConfig({
     vue(),
     vueJsx(),
     vueDevTools(),
-    VitePWA({
+        VitePWA({
       registerType: 'autoUpdate',
-      manifest: { // PWA 매니페스트 설정
-        name: 'My PWA App', // 앱의 전체 이름
-        short_name: 'PWA', // 짧은 이름
-        description: 'Vue.js PWA Example', // 앱 설명
-        theme_color: '#ffffff', // 앱 테마 색상
-        icons: [ // 앱 아이콘(홈 화면 추가 시 표시됨)
+      manifest: { 
+        name: 'Safe13abyAI',
+        short_name: 'SafeBaby',
+        description: 'Vue.js PWA Example',
+        theme_color: '#ffffff',
+        icons: [
           {
             src: '/icon-192x192.png',
             sizes: '192x192',
@@ -32,8 +32,9 @@ export default defineConfig({
             type: 'image/png'
           }
         ]
-      }
+      }, // 여기서 manifest 닫음
     })
+ 
   ],
   resolve: {
     alias: {

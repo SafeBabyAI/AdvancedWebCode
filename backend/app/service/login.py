@@ -14,10 +14,10 @@ load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
 
 ALGORITHM = "HS256"  # JWT 암호화 알고리즘
-ACCESS_TOKEN_EXPIRE_MINUTES = 3 * 24 * 60  # 토큰 유효기간 (3일)
+ACCESS_TOKEN_EXPIRE_MINUTES = 3 * 60  # 토큰 유효기간 (3일)
 
 router = APIRouter()
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")  
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login/")  
 
 # Pydantic 모델을 사용하여 요청 데이터 형식 지정
 class LoginRequest(BaseModel):

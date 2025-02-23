@@ -30,6 +30,7 @@
 <script>
 
 import axios from "axios";
+import api from "@/services/api";
 
 export default {
   data() {
@@ -83,9 +84,10 @@ export default {
 
         // 웹캠 시작
         await this.startWebcam();
+	const wsURL = "wss://safe13aby.koreacentral.cloudapp.azure.com/backend/ws";
 
         // WebSocket 연결 (보안 상의 이유로 JWT를 쿼리 파라미터로 보내지 않음)
-        this.websocket = new WebSocket("ws://127.0.0.1:8000/ws");
+	      this.websocket = new WebSocket(wsURL);
 
         this.websocket.onopen = () => {
             console.log("✅ WebSocket 연결됨");
@@ -208,7 +210,7 @@ export default {
     async stopAlert() {
       try {
         const token = localStorage.getItem("token"); // JWT 가져오기
-        const response = await axios.post("http://127.0.0.1:8000/stop_alert", {}, {
+        const response = await api.post("backend/stop_alert", {}, {
         headers: { 
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}` // ✅ JWT를 헤더에 포함하여 user_id 가져오기
